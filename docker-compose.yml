@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: officelink-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - officelink-lan
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: officelink-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - officelink-lan
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: officelink-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/officelink
+      - REDIS_URI=redis://redis:6379
+      - JWT_SECRET=officelink_airgapped_lan_secret_key_2026_super_secure
+      - JWT_REFRESH_SECRET=officelink_refresh_token_secret_key_2026_super_secure
+      - STORAGE_DIR=/app/uploads/attachments
+      - TEMP_CHUNK_DIR=/app/uploads/chunks
+      - LAN_IP=192.168.29.237
+      - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://192.168.29.237,http://192.168.29.237:80
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - officelink-lan
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: officelink-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - officelink-lan
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  officelink-lan:
+    driver: bridge
